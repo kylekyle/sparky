@@ -1,32 +1,38 @@
 require 'java'
+require 'jruby/core_ext'
 
-sparkConf = org.apache.spark.SparkConf.new.setAppName("JavaWordCount")
-ctx = org.apache.spark.api.java.JavaSparkContext.new sparkConf
-lines = ctx.textFile 'word-count.txt', 1
+import 'scala.Tuple2'
+import 'org.apache.spark.SparkConf'
+import 'org.apache.spark.api.java.JavaSparkContext'
+import 'org.apache.spark.api.java.function.FlatMapFunction'
+import 'org.apache.spark.api.java.function.PairFunction'
+import 'org.apache.spark.api.java.function.Function2'
 
-words = lines.flatMap(FlatMapFunction.new do
-    def call s
-        s.split
-    end
-end)
+configuration = SparkConf.new.setAppName "JavaWordCount"
+context = JavaSparkContext.new configuration
 
-=begin
-JavaPairRDD<String, Integer> ones = words.mapToPair(new PairFunction<String, String, Integer>() {
-    public Tuple2<String, Integer> call(String s) {
-        return new Tuple2<String, Integer>(s, 1);
-    }
-});
+lines = context.textFile 'words.txt', 1
 
-JavaPairRDD<String, Integer> counts = ones.reduceByKey(new Function2<Integer, Integer, Integer>() {
-    public Integer call(Integer i1, Integer i2) {
-        return i1 + i2;
-    }
-});
+class TheOneThatMadeIt
+  include FlatMapFunction
 
-List<Tuple2<String, Integer>> output = counts.collect();
-for (Tuple2<?,?> tuple : output) {
-    System.out.println(tuple._1() + ": " + tuple._2());
-}
+  def call o
+    puts "hello from jRuby"
+  end
 
-ctx.stop
-=end
+  become_java!
+end
+
+`rm test.jar`
+TheOneThatMadeIt.become_java! '.'
+`jar -cf test.jar rubyobj`
+context.add_jar 'test.jar'
+
+foo = Java::SparkyFlatMapFunction.new
+foo.klass = File.read("rubyobj/TheOneThatMadeIt.class").to_java_bytes
+
+words = lines.flatMap TheOneThatMadeIt.new
+output = words.collect
+
+output.each {|a| p a}
+context.stop
