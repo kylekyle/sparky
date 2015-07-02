@@ -3,8 +3,6 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.spark.api.java.function.FlatMapFunction;
-import org.jruby.javasupport.JavaEmbedUtils;
 import org.objectweb.asm.ClassReader;
 import org.jruby.Ruby;
 import org.jruby.embed.PathType;
@@ -14,8 +12,6 @@ import scala.reflect.ClassManifestFactory$;
 import org.apache.spark.serializer.JavaSerializer;
 import org.apache.spark.serializer.SerializerInstance;
 
-import java.net.URL;
-import java.net.URLClassLoader;
 
 public final class Sparky {
     public static byte[] serialize(Serializable object) {
@@ -31,10 +27,7 @@ public final class Sparky {
 
         ClassDefiningJRubyClassLoader loader = new ClassDefiningJRubyClassLoader(Sparky.class.getClassLoader());
         loader.defineClass(className, klass);
-
-        InputStream stream = loader.getResourceAsStream(className);
-        IOUtils.toByteArray(stream);
-
+        
         SerializerInstance serializer = new JavaSerializer().newInstance();
         return serializer.deserialize(ByteBuffer.wrap(instance), loader, ClassManifestFactory$.MODULE$.fromClass(Object.class));
     }
