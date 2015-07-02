@@ -8,8 +8,7 @@ import 'org.apache.spark.api.java.function.FlatMapFunction'
 
 configuration = SparkConf.new.setAppName "JavaWordCount"
 context = JavaSparkContext.new configuration
-
-split = Java::SparkyFlatMapFunction.new 
+split = nil
 
 Dir.mktmpdir do |dir|
 	block = proc do |line|
@@ -26,9 +25,7 @@ Dir.mktmpdir do |dir|
 	java_class_path = File.join dir, *java_class_name.split('.')
 
 	Object.const_set ruby_class_name, klass
-
-	split.instance = Java::Sparky.serialize Object.const_get(ruby_class_name).new
-	split.klass = File.read(java_class_path + '.class').to_java_bytes
+	split = Java::Sparky.new File.read(java_class_path + '.class').to_java_bytes, Object.const_get(ruby_class_name).new
 end
 
 lines = context.textFile 'words.txt', 1
