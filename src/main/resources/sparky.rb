@@ -15,7 +15,13 @@ class JavaRDD
 			else
 				Dir.mktmpdir do |dir|
 					klass = Class.new do
-					  define_method :call, &block
+						if block.arity == -1
+							# Fix blocks created with Symbol#to_proc
+							define_method(:call) {|arg| block.call arg}
+					  else
+					  	define_method :call, &block
+					  end
+
 					  become_java! dir
 					end
 
@@ -33,3 +39,6 @@ class JavaRDD
 		end
 	end
 end
+
+sc = JavaSparkContext.new SparkConf.new.set_app_name("Sparky Shell")
+p sc.text_file('words.txt').flat_map(&:split).collect.to_a
