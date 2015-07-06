@@ -24,7 +24,7 @@ public class Sparky implements FlatMapFunction, Function, Function2 {
   transient Object instance;
 
   public Sparky() {
-
+    
   }
 
   public Sparky(byte[] klass, Serializable object) {

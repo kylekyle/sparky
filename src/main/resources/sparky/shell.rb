@@ -23,7 +23,7 @@ BANNER
 jvm = java.lang.System.getProperty 'java.vm.name'
 java_version = java.lang.System.getProperty 'java.version'
 
-puts banner % [Sparky::VERSION, sc.version, RUBY_VERSION, JRUBY_VERSION, java_version, jvm]
+puts banner % [Sparky::VERSION, SPARK_VERSION, RUBY_VERSION, JRUBY_VERSION, java_version, jvm]
 
 class Binding
 	remove_method :local_variable_set

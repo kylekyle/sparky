@@ -39,6 +39,3 @@ class JavaRDD
 		end
 	end
 end
-
-sc = JavaSparkContext.new SparkConf.new.set_app_name("Sparky Shell")
-p sc.text_file('words.txt').flat_map(&:split).collect.to_a
