@@ -42,9 +42,6 @@
         </configuration>
         <executions>
           <execution>
-            <configuration>
-              <jrubyVersion>1.7.19</jrubyVersion>
-            </configuration>
             <goals>
               <goal>initialize</goal>
             </goals>
@@ -109,7 +106,7 @@
     <dependency>
       <groupId>org.jruby</groupId>
       <artifactId>jruby</artifactId>
-      <version>9.0.0.0.rc1</version>
+      <version>9.0.0.0</version>
     </dependency>
 
     <dependency>
@@ -125,5 +122,16 @@
       <version>0.5.3</version>
       <type>gem</type>
     </dependency>
+    
+    <dependency>
+      <groupId>rubygems</groupId>
+      <artifactId>jruby-scala</artifactId>
+      <version>0.1.1</version>
+      <type>gem</type>
+    </dependency>
   </dependencies>
+    <properties>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
+    </properties>
 </project>

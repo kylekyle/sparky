@@ -14,7 +14,10 @@ class JavaRDD
 				super *args
 			else
 				Dir.mktmpdir do |dir|
-					klass = Class.new do
+					class AnonRubyClass
+					end
+
+					AnonRubyClass.instance_eval do 
 						if block.arity == -1
 							# Fix blocks created with Symbol#to_proc
 							define_method(:call) {|arg| block.call arg}
@@ -25,13 +28,13 @@ class JavaRDD
 					  become_java! dir
 					end
 
-					java_class_name = klass.java_class.get_name
+					java_class_name = AnonRubyClass.java_class.get_name
 					ruby_class_name = java_class_name[/[A-Z].+/]
 					java_class_path = File.join dir, *java_class_name.split('.')
 
-					Object.const_set ruby_class_name, klass
+					#Object.const_set ruby_class_name, klass
 					class_bytes = File.read(java_class_path + '.class').to_java_bytes
-					instance = Object.const_get(ruby_class_name).new
+					instance = AnonRubyClass.new
 					
 					super Sparky.new(class_bytes, instance)
 				end
@@ -39,3 +42,6 @@ class JavaRDD
 		end
 	end
 end
+
+sc = JavaSparkContext.new SparkConf.new.set_app_name("Sparky Shell")
+p sc.text_file('words.txt').map{|a| p a; [a.reverse.to_java(:string)]}.collect.to_a

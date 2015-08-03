@@ -15,6 +15,7 @@ import org.jruby.util.ClassDefiningJRubyClassLoader;
 import scala.reflect.ClassManifestFactory$;
 import org.apache.spark.serializer.JavaSerializer;
 import org.apache.spark.serializer.SerializerInstance;
+import org.jruby.javasupport.Java;
 import org.jruby.javasupport.JavaEmbedUtils;
 
 public class Sparky implements FlatMapFunction, Function, Function2 {
@@ -24,7 +25,6 @@ public class Sparky implements FlatMapFunction, Function, Function2 {
   transient Object instance;
 
   public Sparky() {
-    
   }
 
   public Sparky(byte[] klass, Serializable object) {
@@ -36,14 +36,16 @@ public class Sparky implements FlatMapFunction, Function, Function2 {
 
   private Object instance() throws Exception {
     if (instance == null) {
-      Ruby.setThreadLocalRuntime(Ruby.getGlobalRuntime());
+      if (Ruby.getThreadLocalRuntime() == null) {
+        Ruby.setThreadLocalRuntime(Ruby.newInstance());
+      }
 
       ClassReader cr = new ClassReader(klass);
       String className = cr.getClassName().replace('/', '.');
 
-      ClassDefiningJRubyClassLoader loader = new ClassDefiningJRubyClassLoader(Sparky.class.getClassLoader());
+      ClassDefiningJRubyClassLoader loader = Ruby.getThreadLocalRuntime().getJRubyClassLoader();
       loader.defineClass(className, klass);
-
+      //.evalScriptlet("import 'rubyobj.AnonymousRubyClass__1356'");
       SerializerInstance serializer = new JavaSerializer().newInstance();
       instance = serializer.deserialize(ByteBuffer.wrap(serialized), loader, ClassManifestFactory$.MODULE$.fromClass(Object.class));
     }
