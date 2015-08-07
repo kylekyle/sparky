@@ -1,8 +1,5 @@
 package org.apache.spark.api.ruby;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Arrays;
 import org.apache.spark.api.java.function.FlatMapFunction;
@@ -14,32 +11,45 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyProc;
 import org.jruby.RubyString;
 
-public class Sparky implements FlatMapFunction, Function, Function2, Serializable {
+public final class Sparky implements FlatMapFunction, Function, Function2, Serializable {
 
-  private final byte[] bytes;
-  private transient RubyProc proc = null;
-  private transient ScriptingContainer engine = newScriptingContainer();
+  private byte[] bytes;
+  private transient RubyProc proc;
+  private transient ScriptingContainer engine;
+
+  public Sparky() {
+  }
 
   public Sparky(RubyProc proc) {
     this.proc = proc;
-    this.bytes = engine.callMethod(proc, "to_bytes", RubyString.class).getBytes();
+    this.bytes = getEngine().callMethod(proc, "to_bytes", RubyString.class).getBytes();
+  }
+
+  public ScriptingContainer getEngine() {
+    if (engine == null) {
+      engine = new ScriptingContainer() {
+        {
+          setCompileMode(RubyInstanceConfig.CompileMode.OFF);
+          runScriptlet("ENV.delete 'GEM_PATH'; ENV.delete 'GEM_HOME'");
+          runScriptlet("require 'org/apache/spark/api/ruby/proc_to_bytes'");
+        }
+      };
+    }
+
+    return engine;
   }
 
   public RubyProc getProc() {
-    if (engine == null) {
-      engine = newScriptingContainer();
+    if (proc == null) {
+      getEngine().put("bytes", bytes);
+      proc = (RubyProc) getEngine().runScriptlet("Proc.from_bytes(String.from_java_bytes(bytes))");
     }
 
-    if (proc == null) {
-      engine.put("bytes", bytes);
-      proc = (RubyProc) engine.runScriptlet("Proc.from_bytes(String.from_java_bytes(bytes))");
-    }
-    
     return proc;
   }
 
   public static void main(String[] args) throws Exception {
-    ScriptingContainer engine = newScriptingContainer();
+    ScriptingContainer engine = new Sparky().getEngine();
 
     if (args.length == 0) {
       engine.runScriptlet("require 'sparky/shell'");
@@ -52,22 +62,11 @@ public class Sparky implements FlatMapFunction, Function, Function2, Serializabl
   @Override
   public Iterable call(Object o) throws Exception {
     getProc();
-    return engine.callMethod(getProc(), "call", o, Iterable.class);
+    return getEngine().callMethod(getProc(), "call", o, Iterable.class);
   }
 
   @Override
   public Object call(Object o1, Object o2) throws Exception {
-    getProc();
-    return engine.callMethod(getProc(), "call", new Object[]{o1, o2});
-  }
-
-  private static ScriptingContainer newScriptingContainer() {
-    return new ScriptingContainer() {
-      {
-        setCompileMode(RubyInstanceConfig.CompileMode.OFF);
-        runScriptlet("ENV.delete 'GEM_PATH'; ENV.delete 'GEM_HOME'");
-        runScriptlet("require 'org/apache/spark/api/ruby/proc_to_bytes'");
-      }
-    };
+    return getEngine().callMethod(getProc(), "call", new Object[]{o1, o2});
   }
 }
