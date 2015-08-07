@@ -202,10 +202,6 @@ class ProcReader extends IRReaderStream {
       if (RubyInstanceConfig.IR_WRITING_DEBUG) {
         System.err.println(instructions[i].getClass().getName());
       }
-
-      if (instructions[i] instanceof ZeroOperandArgNoBlockCallInstr) {
-        System.out.println(((ZeroOperandArgNoBlockCallInstr) instructions[i]).getClosureArg());
-      }
     }
 
     IRScope lexicalParent = new IRScope(context.getRuntime().getIRManager(), currentScope, "(serialized proc)", "(serialized proc)", 0, null) {

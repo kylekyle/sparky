@@ -1,63 +1,45 @@
 package org.apache.spark.api.ruby;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
-
-import org.objectweb.asm.ClassReader;
-import org.jruby.Ruby;
 import org.jruby.embed.PathType;
 import org.jruby.embed.ScriptingContainer;
-import org.jruby.util.ClassDefiningJRubyClassLoader;
-import scala.reflect.ClassManifestFactory$;
-import org.apache.spark.serializer.JavaSerializer;
-import org.apache.spark.serializer.SerializerInstance;
-import org.jruby.javasupport.Java;
-import org.jruby.javasupport.JavaEmbedUtils;
+import org.jruby.RubyInstanceConfig;
+import org.jruby.RubyProc;
+import org.jruby.RubyString;
 
-public class Sparky implements FlatMapFunction, Function, Function2 {
+public class Sparky implements FlatMapFunction, Function, Function2, Serializable {
 
-  private byte[] klass;
-  private byte[] serialized;
-  transient Object instance;
+  private final byte[] bytes;
+  private transient RubyProc proc = null;
+  private transient ScriptingContainer engine = newScriptingContainer();
 
-  public Sparky() {
+  public Sparky(RubyProc proc) {
+    this.proc = proc;
+    this.bytes = engine.callMethod(proc, "to_bytes", RubyString.class).getBytes();
   }
 
-  public Sparky(byte[] klass, Serializable object) {
-    this.klass = klass;
-
-    SerializerInstance serializer = new JavaSerializer().newInstance();
-    serialized = serializer.serialize(object, ClassManifestFactory$.MODULE$.fromClass(Serializable.class)).array();
-  }
-
-  private Object instance() throws Exception {
-    if (instance == null) {
-      if (Ruby.getThreadLocalRuntime() == null) {
-        Ruby.setThreadLocalRuntime(Ruby.newInstance());
-      }
-
-      ClassReader cr = new ClassReader(klass);
-      String className = cr.getClassName().replace('/', '.');
-
-      ClassDefiningJRubyClassLoader loader = Ruby.getThreadLocalRuntime().getJRubyClassLoader();
-      loader.defineClass(className, klass);
-      //.evalScriptlet("import 'rubyobj.AnonymousRubyClass__1356'");
-      SerializerInstance serializer = new JavaSerializer().newInstance();
-      instance = serializer.deserialize(ByteBuffer.wrap(serialized), loader, ClassManifestFactory$.MODULE$.fromClass(Object.class));
+  public RubyProc getProc() {
+    if (engine == null) {
+      engine = newScriptingContainer();
     }
 
-    return instance;
+    if (proc == null) {
+      engine.put("bytes", bytes);
+      proc = (RubyProc) engine.runScriptlet("Proc.from_bytes(String.from_java_bytes(bytes))");
+    }
+    
+    return proc;
   }
 
   public static void main(String[] args) throws Exception {
-    ScriptingContainer engine = new ScriptingContainer();
-
-    // this is the hack I came up with to get this jar to ignore system gems
-    engine.runScriptlet("ENV.delete 'GEM_PATH'; ENV.delete 'GEM_HOME'");
+    ScriptingContainer engine = newScriptingContainer();
 
     if (args.length == 0) {
       engine.runScriptlet("require 'sparky/shell'");
@@ -67,11 +49,25 @@ public class Sparky implements FlatMapFunction, Function, Function2 {
     }
   }
 
-  public Iterable call(Object t) throws Exception {
-    return (Iterable) JavaEmbedUtils.invokeMethod(Ruby.getGlobalRuntime(), instance(), "call", new Object[]{t}, Iterable.class);
+  @Override
+  public Iterable call(Object o) throws Exception {
+    getProc();
+    return engine.callMethod(getProc(), "call", o, Iterable.class);
   }
 
-  public Object call(Object v1, Object v2) throws Exception {
-    return JavaEmbedUtils.invokeMethod(Ruby.getGlobalRuntime(), instance(), "call", new Object[]{v1, v2}, Object.class);
+  @Override
+  public Object call(Object o1, Object o2) throws Exception {
+    getProc();
+    return engine.callMethod(getProc(), "call", new Object[]{o1, o2});
+  }
+
+  private static ScriptingContainer newScriptingContainer() {
+    return new ScriptingContainer() {
+      {
+        setCompileMode(RubyInstanceConfig.CompileMode.OFF);
+        runScriptlet("ENV.delete 'GEM_PATH'; ENV.delete 'GEM_HOME'");
+        runScriptlet("require 'org/apache/spark/api/ruby/proc_to_bytes'");
+      }
+    };
   }
 }
